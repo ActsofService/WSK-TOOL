@@ -14,14 +14,18 @@ const generateButton = document.getElementById("generate");
 const downloadLink = document.getElementById("download");
 const fileInput = document.getElementById("file");
 const lengthButtons = document.querySelectorAll("[data-length]");
+const formatButtons = document.querySelectorAll("[data-format]");
 const params = document.getElementById("params");
 const swatches = document.getElementById("swatches");
-const tempoInput = document.getElementById("tempo");
-const tempoRead = document.getElementById("tempo-read");
-const countInput = document.getElementById("count");
-const countRead = document.getElementById("count-read");
+const counts = document.getElementById("counts");
+const tempoButtons = document.querySelectorAll("[data-tempo]");
 const groundInput = document.getElementById("ground");
+const groundChip = document.getElementById("ground-chip");
+const groundOpen = document.getElementById("ground-open");
+const hexInput = document.getElementById("hex");
+const groundHex = document.getElementById("ground-hex");
 const photoButton = document.getElementById("photo");
+const loopButton = document.getElementById("loop");
 
 canvas.width = WIDTH;
 canvas.height = HEIGHT;
@@ -29,11 +33,14 @@ canvas.height = HEIGHT;
 const INTRO = 7.6;
 
 let duration = 10;
+let format = "webm";
 let tempo = 1;
 let showPhoto = false;
+let loopOn = false;
 let sourceImage = null;
 let analysis = null;
 let selected = [];
+let hexIndex = 0;
 let sceneSeed = 1;
 let scene = null;
 let animTime = 0;
@@ -219,9 +226,10 @@ const shuffle = (list, rand) => {
 };
 
 const FIELD = [
-    [0.08, 0.22], [0.24, 0.16], [0.4, 0.28], [0.56, 0.18], [0.72, 0.26], [0.9, 0.2],
-    [0.12, 0.5], [0.3, 0.56], [0.48, 0.46], [0.66, 0.54], [0.86, 0.48],
-    [0.18, 0.76], [0.4, 0.72], [0.62, 0.78], [0.84, 0.7]
+    [0.07, 0.16], [0.22, 0.12], [0.38, 0.2], [0.54, 0.11], [0.7, 0.18], [0.88, 0.14],
+    [0.1, 0.38], [0.26, 0.34], [0.44, 0.42], [0.6, 0.32], [0.76, 0.4], [0.93, 0.36],
+    [0.06, 0.58], [0.22, 0.64], [0.4, 0.54], [0.56, 0.62], [0.74, 0.56], [0.9, 0.66],
+    [0.14, 0.8], [0.32, 0.76], [0.5, 0.84], [0.68, 0.74], [0.86, 0.82]
 ];
 
 /* Varje frö är en ny placering. Färgerna kommer alltid från samma bild. */
@@ -236,27 +244,31 @@ const buildScene = (palette, seed) => {
         return color;
     };
 
-    const plan = shuffle(["sharp", "sharp", "sharp", "sharp", "sharp", "sharp", "soft", "soft", "soft", "soft", "bokeh", "bokeh", "bokeh", "bokeh"], rand);
+    const kinds = [
+        "sharp", "sharp", "sharp", "sharp", "sharp", "sharp", "sharp",
+        "soft", "soft", "soft", "soft", "soft", "soft", "soft", "soft",
+        "bokeh", "bokeh", "bokeh", "bokeh", "bokeh", "bokeh", "bokeh"
+    ];
+    const plan = shuffle(kinds, rand);
     const slots = shuffle(FIELD, rand);
     const orbs = plan.map((kind, index) => {
         const [sx, sy] = slots[index];
         const radius = kind === "sharp"
-            ? 0.028 + rand() * 0.082
+            ? 0.05 + rand() * 0.1
             : kind === "soft"
-                ? 0.024 + rand() * 0.064
-                : 0.04 + rand() * 0.09;
+                ? 0.058 + rand() * 0.095
+                : 0.082 + rand() * 0.11;
         return {
             kind,
-            x: clamp(sx + (rand() - 0.5) * 0.1, -0.05, 1.05),
-            y: clamp(sy + (rand() - 0.5) * 0.08, 0.05, 0.9),
+            x: clamp(sx + (rand() - 0.5) * 0.07, 0.02, 0.98),
+            y: clamp(sy + (rand() - 0.5) * 0.06, 0.06, 0.92),
             radius,
             fill: nextColor(),
             phase: rand() * Math.PI * 2,
-            speed: 0.34 + rand() * 0.38,
-            drift: kind === "sharp" ? 0.04 + rand() * 0.025 : 0.03 + rand() * 0.02,
-            vx: (rand() - 0.5) * 0.022,
-            vy: (rand() - 0.5) * 0.016,
-            social: kind !== "sharp" || rand() < 0.7
+            speed: 0.24 + rand() * 0.28,
+            drift: kind === "sharp" ? 0.055 + rand() * 0.04 : 0.048 + rand() * 0.034,
+            social: kind !== "sharp" || rand() < 0.85,
+            meets: []
         };
     });
 
@@ -264,44 +276,62 @@ const buildScene = (palette, seed) => {
         kind: "bloom",
         x: 0.18 + rand() * 0.1,
         y: 0.8 + rand() * 0.06,
-        radius: 0.14 + rand() * 0.03,
+        radius: 0.16 + rand() * 0.05,
         fill: palette.accent,
         phase: rand() * Math.PI * 2,
-        speed: 0.22,
-        drift: 0.03,
-        vx: (rand() - 0.5) * 0.012,
-        vy: -0.006,
+        speed: 0.16,
+        drift: 0.035,
         social: false
     }, {
         kind: "bloom",
         x: 0.62 + rand() * 0.12,
         y: 0.82 + rand() * 0.05,
-        radius: 0.12 + rand() * 0.03,
+        radius: 0.15 + rand() * 0.04,
         fill: palette.accent,
         phase: rand() * Math.PI * 2,
-        speed: 0.18,
-        drift: 0.028,
-        vx: (rand() - 0.5) * 0.012,
-        vy: -0.005,
+        speed: 0.14,
+        drift: 0.03,
         social: false
     });
 
     const sized = orbs.filter((orb) => orb.kind !== "bloom");
-    if (sized[0]) sized[0].radius = Math.min(0.21, sized[0].radius * 1.8);
-    if (sized[2]) sized[2].radius = Math.max(0.022, sized[2].radius * 0.58);
-    if (sized[5]) sized[5].radius = Math.min(0.17, sized[5].radius * 1.42);
+    if (sized[0]) sized[0].radius = Math.min(0.26, sized[0].radius * 1.6);
+    if (sized[2]) sized[2].radius = Math.max(0.022, sized[2].radius * 0.45);
+    if (sized[5]) sized[5].radius = Math.min(0.2, sized[5].radius * 1.35);
+    if (sized[8]) sized[8].radius = Math.min(0.18, sized[8].radius * 1.25);
 
-    const partners = orbs.filter((orb) => orb.social && orb.kind !== "bloom");
-    for (let i = 0; i + 1 < partners.length && i < 4; i += 2) {
-        const a = partners[i];
-        const b = partners[i + 1];
-        const cx = (a.x + b.x) / 2;
-        const cy = (a.y + b.y) / 2;
-        const dist = 0.09 + rand() * 0.035;
-        const spin = 0.42 + rand() * 0.28;
-        a.couple = { cx, cy, phase: rand() * Math.PI * 2, dist, spin, vx: a.vx, vy: a.vy };
-        b.couple = { cx, cy, phase: a.couple.phase + Math.PI, dist, spin, vx: a.vx, vy: a.vy };
+    const socials = orbs.filter((orb) => orb.social && orb.kind !== "bloom");
+    const spanOf = (a, b) => Math.hypot((a.x - b.x) * (WIDTH / HEIGHT), a.y - b.y);
+    const degree = new Map();
+    const linked = new Set();
+    const edges = [];
+    for (let i = 0; i < socials.length; i++) {
+        for (let j = i + 1; j < socials.length; j++) {
+            edges.push({ a: socials[i], b: socials[j], dist: spanOf(socials[i], socials[j]) });
+        }
     }
+    edges.sort((a, b) => a.dist - b.dist);
+    const link = (maxDegree, maxLinks, maxDist) => {
+        let made = 0;
+        edges.forEach((edge) => {
+            if (made >= maxLinks || edge.dist > maxDist) return;
+            const key = edge.a.x + ":" + edge.b.x + ":" + edge.a.y + ":" + edge.b.y;
+            if (linked.has(key)) return;
+            const da = degree.get(edge.a) || 0;
+            const db = degree.get(edge.b) || 0;
+            if (da >= maxDegree || db >= maxDegree) return;
+            linked.add(key);
+            degree.set(edge.a, da + 1);
+            degree.set(edge.b, db + 1);
+            const phase = rand() * Math.PI * 2;
+            const spin = 0.34 + rand() * 0.22;
+            edge.a.meets.push({ other: edge.b, phase, spin });
+            edge.b.meets.push({ other: edge.a, phase, spin });
+            made += 1;
+        });
+    };
+    link(1, 8, 0.72);
+    link(2, 5, 0.58);
 
     const smears = [0, 1, 2].map(() => ({
         x: rand(),
@@ -334,22 +364,32 @@ const buildScene = (palette, seed) => {
     return { bg: palette.bg, accent: palette.accent, orbs, smears };
 };
 
+/* En loop är ett långsamt varv. Den är tillbaka av sig själv, utan ett ryck på slutet. */
+const motion = (time, omega, phase) => {
+    if (!loopOn) return time * omega + phase;
+    return phase + (time / duration) * Math.PI * 2;
+};
+
+/* Varje boll vandrar runt sin plats. Par som redan står nära går ihop och tillbaka. */
 const pointOf = (orb, time, width, height) => {
     const unit = Math.min(width, height);
-    const radius = orb.radius * unit * (1 + Math.sin(time * orb.speed * 0.85 + orb.phase) * 0.07);
-    if (orb.couple) {
-        const couple = orb.couple;
-        const angle = couple.phase + time * couple.spin;
-        const breathe = 0.55 + (Math.sin(time * couple.spin * 0.65) + 1) * 0.38;
-        return {
-            x: couple.cx * width + (time * couple.vx + Math.cos(angle) * couple.dist * breathe) * unit,
-            y: couple.cy * height + (time * couple.vy + Math.sin(angle) * couple.dist * 0.7 * breathe) * unit,
-            radius
-        };
-    }
+    const sway = loopOn ? 0.45 : 1;
+    const radius = orb.radius * unit * (1 + Math.sin(motion(time, orb.speed * 0.85, orb.phase)) * 0.06);
+    const roamX = Math.sin(motion(time, orb.speed, orb.phase)) * orb.drift * sway
+        + Math.sin(motion(time, orb.speed * 0.37, orb.phase * 1.7)) * orb.drift * 0.45 * sway;
+    const roamY = Math.cos(motion(time, orb.speed * 0.72, orb.phase)) * orb.drift * 0.7 * sway
+        + Math.cos(motion(time, orb.speed * 0.29, orb.phase * 2.1)) * orb.drift * 0.4 * sway;
+    let x = orb.x;
+    let y = orb.y;
+    const meetReach = loopOn ? 0.18 : 0.52;
+    (orb.meets || []).forEach((meet) => {
+        const amount = 0.5 - 0.5 * Math.cos(motion(time, meet.spin, meet.phase));
+        x += (meet.other.x - orb.x) * meetReach * amount;
+        y += (meet.other.y - orb.y) * meetReach * amount;
+    });
     return {
-        x: orb.x * width + (Math.sin(time * orb.speed + orb.phase) * orb.drift + time * orb.vx) * unit,
-        y: orb.y * height + (Math.cos(time * orb.speed * 0.7 + orb.phase) * orb.drift * 0.75 + time * orb.vy) * unit,
+        x: x * width + roamX * unit,
+        y: y * height + roamY * unit,
         radius
     };
 };
@@ -375,13 +415,14 @@ const fineGrain = makeGrain(280, 118);
 const coarseGrain = makeGrain(140, 52);
 
 const drawSmear = (smear, time, width, height) => {
-    const x = (smear.x + Math.sin(time * smear.speed + smear.phase) * 0.08) * width;
-    const y = (smear.y + Math.cos(time * smear.speed * 0.6 + smear.phase) * 0.05) * height;
+    const sway = loopOn ? 0.45 : 1;
+    const x = (smear.x + Math.sin(motion(time, smear.speed, smear.phase)) * 0.08 * sway) * width;
+    const y = (smear.y + Math.cos(motion(time, smear.speed * 0.6, smear.phase)) * 0.05 * sway) * height;
     const length = smear.length * Math.min(width, height);
     const thick = smear.thick * height;
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(smear.angle + Math.sin(time * 0.15 + smear.phase) * 0.08);
+    ctx.rotate(smear.angle + Math.sin(motion(time, 0.15, smear.phase)) * 0.08 * sway);
     ctx.filter = "blur(16px)";
     const fade = ctx.createLinearGradient(-length / 2, 0, length / 2, 0);
     fade.addColorStop(0, rgb(smear.color, 0));
@@ -408,7 +449,26 @@ const drawGrain = (width, height, amount) => {
     ctx.restore();
 };
 
-/* När två sociala bollar nuddar varandra växer en mjuk hals mellan dem. */
+let linkCanvas = null;
+let linkCtx = null;
+let linkDrawn = false;
+
+const linkLayer = (width, height) => {
+    if (!linkCanvas) {
+        linkCanvas = document.createElement("canvas");
+        linkCtx = linkCanvas.getContext("2d");
+    }
+    if (linkCanvas.width !== width || linkCanvas.height !== height) {
+        linkCanvas.width = width;
+        linkCanvas.height = height;
+    } else {
+        linkCtx.clearRect(0, 0, width, height);
+    }
+    linkDrawn = false;
+    return linkCtx;
+};
+
+/* Ett mjukt streck tonar fram när två bollar möts, och försvinner när de glider isär. */
 const drawMerge = (a, b) => {
     if (!a.orb.social || !b.orb.social) return;
     if (a.orb.kind === "bloom" || b.orb.kind === "bloom") return;
@@ -417,24 +477,24 @@ const drawMerge = (a, b) => {
     const smaller = Math.min(r1, r2);
     const distance = Math.hypot(b.x - a.x, b.y - a.y);
     const gap = distance - r1 - r2;
-    if (gap > smaller * 0.28 || distance < 2 || Math.max(r1, r2) > smaller * 2.1) return;
+    const reach = smaller * 1.15;
+    if (gap > reach || distance < 2 || Math.max(r1, r2) > smaller * 3) return;
 
-    const closeness = clamp(1 - gap / (smaller * 0.28), 0, 1);
-    const neck = smaller * (0.7 + closeness * 0.55);
-    ctx.save();
-    ctx.lineCap = "round";
-    ctx.lineWidth = neck * 2;
-    ctx.filter = "blur(10px)";
-    const gradient = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-    gradient.addColorStop(0.15, rgb(a.orb.fill, 1));
-    gradient.addColorStop(0.5, rgb(mix(a.orb.fill, b.orb.fill, 0.5), 1));
-    gradient.addColorStop(0.85, rgb(b.orb.fill, 1));
-    ctx.strokeStyle = gradient;
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
-    ctx.restore();
+    const closeness = ease(clamp(1 - gap / reach, 0, 1));
+    if (closeness < 0.02) return;
+    const neck = smaller * closeness * (0.42 + closeness * 0.5);
+    linkCtx.lineCap = "round";
+    linkCtx.lineWidth = neck * 2;
+    const gradient = linkCtx.createLinearGradient(a.x, a.y, b.x, b.y);
+    gradient.addColorStop(0.15, rgb(a.orb.fill, closeness));
+    gradient.addColorStop(0.5, rgb(mix(a.orb.fill, b.orb.fill, 0.5), closeness));
+    gradient.addColorStop(0.85, rgb(b.orb.fill, closeness));
+    linkCtx.strokeStyle = gradient;
+    linkCtx.beginPath();
+    linkCtx.moveTo(a.x, a.y);
+    linkCtx.lineTo(b.x, b.y);
+    linkCtx.stroke();
+    linkDrawn = true;
 };
 
 /* En liten virvel av de två färgerna, ovanpå mötet. */
@@ -444,17 +504,16 @@ const drawSwirl = (a, b, time) => {
     const smaller = Math.min(a.radius, b.radius);
     const distance = Math.hypot(b.x - a.x, b.y - a.y);
     const gap = distance - a.radius - b.radius;
-    if (gap > smaller * 0.28 || distance < 2 || Math.max(a.radius, b.radius) > smaller * 2.1) return;
-    const closeness = clamp(1 - gap / (smaller * 0.28), 0, 1);
-    if (closeness < 0.45) return;
+    const reach = smaller * 1.15;
+    if (gap > reach || distance < 2 || Math.max(a.radius, b.radius) > smaller * 3) return;
+    const closeness = ease(clamp(1 - gap / reach, 0, 1));
+    if (closeness < 0.08) return;
 
     const mx = (a.x + b.x) / 2;
     const my = (a.y + b.y) / 2;
-    const spin = Math.atan2(b.y - a.y, b.x - a.x) + time * 0.55;
+    const spin = Math.atan2(b.y - a.y, b.x - a.x) + motion(time, 0.55, 0);
     const offset = smaller * 0.22 * closeness;
-    const lobe = smaller * (0.32 + closeness * 0.26);
-    ctx.save();
-    ctx.filter = "blur(8px)";
+    const lobe = smaller * closeness * (0.34 + closeness * 0.28);
     [
         [Math.cos(spin), Math.sin(spin), a.orb.fill],
         [-Math.cos(spin), -Math.sin(spin), b.orb.fill]
@@ -462,32 +521,30 @@ const drawSwirl = (a, b, time) => {
         const x = mx + dx * offset;
         const y = my + dy * offset;
         const eddy = ctx.createRadialGradient(x, y, 0, x, y, lobe);
-        eddy.addColorStop(0, rgb(color, 0.8));
+        eddy.addColorStop(0, rgb(color, 0.72 * closeness));
         eddy.addColorStop(1, rgb(color, 0));
         ctx.fillStyle = eddy;
         ctx.beginPath();
         ctx.arc(x, y, lobe, 0, Math.PI * 2);
         ctx.fill();
     });
-    ctx.restore();
 };
 
 const gather = (points) => {
-    points.forEach((point) => {
-        point.homeX = point.x;
-        point.homeY = point.y;
-    });
     for (let i = 0; i < points.length; i++) {
         for (let j = i + 1; j < points.length; j++) {
             const a = points[i];
             const b = points[j];
             if (!a.orb.social || !b.orb.social) continue;
+            if (a.orb.kind === "bloom" || b.orb.kind === "bloom") continue;
             const dx = b.x - a.x;
             const dy = b.y - a.y;
             const distance = Math.hypot(dx, dy) || 1;
-            const reach = (a.radius + b.radius) * 1.7;
-            if (distance > reach) continue;
-            const pull = (1 - distance / reach) * 0.34;
+            const smaller = Math.min(a.radius, b.radius);
+            const gap = distance - a.radius - b.radius;
+            const reach = smaller * 0.9;
+            if (gap > reach) continue;
+            const pull = ease(clamp(1 - gap / reach, 0, 1)) * 0.05;
             a.x += dx * pull * 0.5;
             a.y += dy * pull * 0.5;
             b.x -= dx * pull * 0.5;
@@ -510,7 +567,7 @@ const ease = (value) => value * value * value * (value * (value * 6 - 15) + 10);
 
 /* Bilden hålls kvar, mjuknar långsamt och glider över i bollarna. */
 const openingOf = (clock) => {
-    if (!showPhoto || !sourceImage) return { blur: 1, grain: 1, photo: 0, orbs: 1 };
+    if (loopOn || !showPhoto || !sourceImage) return { blur: 1, grain: 1, photo: 0, orbs: 1 };
     const span = recording ? Math.min(INTRO, Math.max(4.6, duration * 0.68)) : INTRO;
     const stage = clamp(clock / span, 0, 1);
     const blur = ease(clamp((stage - 0.18) / 0.46, 0, 1));
@@ -601,19 +658,24 @@ const paint = (time, clock, fade) => {
             const distance = Math.hypot(other.x - point.x, other.y - point.y);
             const smaller = Math.min(point.radius, other.radius);
             const gap = distance - point.radius - other.radius;
-            const reach = smaller * 0.75;
-            if (gap < reach) swell = Math.max(swell, clamp(1 - Math.max(gap, 0) / reach, 0, 1));
+            const reach = smaller * 1.35;
+            if (gap < reach) swell = Math.max(swell, ease(clamp(1 - gap / reach, 0, 1)));
         });
         return swell;
     });
     points.forEach((point, index) => {
-        point.radius *= 1 + swellOf[index] * 0.34;
+        point.radius *= 1 + swellOf[index] * 0.22;
     });
     points.sort((a, b) => order[a.orb.kind] - order[b.orb.kind]);
+    linkLayer(width, height);
     for (let i = 0; i < points.length; i++) {
         for (let j = i + 1; j < points.length; j++) drawMerge(points[i], points[j]);
     }
-    ctx.filter = "none";
+    if (linkDrawn) {
+        ctx.filter = "blur(10px)";
+        ctx.drawImage(linkCanvas, 0, 0);
+        ctx.filter = "none";
+    }
 
     const meltOf = (point) => {
         let melt = 0;
@@ -622,8 +684,8 @@ const paint = (time, clock, fade) => {
             const distance = Math.hypot(other.x - point.x, other.y - point.y);
             const smaller = Math.min(point.radius, other.radius);
             const gap = distance - point.radius - other.radius;
-            const reach = smaller * 1.45;
-            if (gap < reach) melt = Math.max(melt, clamp(1 - gap / reach, 0, 1));
+            const reach = smaller * 1.7;
+            if (gap < reach) melt = Math.max(melt, ease(clamp(1 - gap / reach, 0, 1)));
         });
         return melt;
     };
@@ -706,10 +768,16 @@ const applyBackground = () => {
     document.documentElement.style.setProperty("--bg", rgb(scene.bg));
 };
 
-const tempoWord = (value) => {
-    if (value < 0.75) return "Långsamt";
-    if (value > 1.25) return "Snabbt";
-    return "Medel";
+const openPicker = (input) => {
+    try {
+        if (typeof input.showPicker === "function") {
+            input.showPicker();
+            return;
+        }
+    } catch (error) {
+        /* Öppna via klick om showPicker inte tillåts. */
+    }
+    input.click();
 };
 
 const activePalette = () => {
@@ -731,17 +799,57 @@ const colorOf = (hex) => ({
     b: parseInt(hex.slice(5, 7), 16)
 });
 
+const parseHex = (value, allowShort) => {
+    const raw = value.trim().replace(/^#/, "");
+    if (/^[\da-f]{6}$/i.test(raw)) return colorOf(`#${raw}`);
+    if (allowShort && /^[\da-f]{3}$/i.test(raw)) {
+        return colorOf(`#${raw.replace(/./g, (part) => part + part)}`);
+    }
+    return null;
+};
+
 const repaintScene = () => {
     scene = buildScene(activePalette(), sceneSeed);
     applyBackground();
 };
 
+const markHex = () => {
+    swatches.querySelectorAll(".dot").forEach((dot, index) => {
+        dot.dataset.edit = index === hexIndex ? "true" : "false";
+    });
+};
+
+const showHex = () => {
+    if (!analysis || document.activeElement === hexInput) return;
+    const color = analysis.colors[hexIndex];
+    if (color) hexInput.value = hexOf(color);
+    markHex();
+};
+
+const applySwatchHex = (value, allowShort) => {
+    if (recording || !analysis) return false;
+    const color = parseHex(value, allowShort);
+    if (!color) return false;
+    analysis.colors[hexIndex] = color;
+    const dot = swatches.querySelectorAll(".dot")[hexIndex];
+    const chip = dot && dot.querySelector(".swatch-chip");
+    const picker = dot && dot.querySelector(".picker");
+    const hex = hexOf(color);
+    if (chip) chip.style.background = hex;
+    if (picker) picker.value = hex;
+    if (selected[hexIndex]) analysis.accent = color;
+    repaintScene();
+    return true;
+};
+
 const renderSwatches = () => {
+    if (hexIndex >= analysis.colors.length) hexIndex = 0;
     swatches.replaceChildren();
     analysis.colors.forEach((color, index) => {
         const dot = document.createElement("div");
         dot.className = "dot";
         dot.dataset.on = selected[index] ? "true" : "false";
+        dot.dataset.edit = index === hexIndex ? "true" : "false";
 
         const hide = document.createElement("button");
         hide.type = "button";
@@ -756,39 +864,99 @@ const renderSwatches = () => {
             dot.dataset.on = selected[index] ? "true" : "false";
             hide.setAttribute("aria-pressed", selected[index] ? "true" : "false");
             hide.setAttribute("aria-label", selected[index] ? "Dölj färgen" : "Visa färgen");
-            syncCount();
+            markCount();
             repaintScene();
         });
+
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "swatch-chip";
+        chip.style.background = hexOf(color);
+        chip.setAttribute("aria-label", "Ändra färg");
 
         const input = document.createElement("input");
         input.type = "color";
-        input.className = "swatch";
+        input.className = "picker";
         input.value = hexOf(color);
-        input.setAttribute("aria-label", "Ändra färg");
-        input.addEventListener("input", () => {
+        input.tabIndex = -1;
+
+        const applyColor = () => {
             if (recording) return;
             analysis.colors[index] = colorOf(input.value);
+            chip.style.background = input.value;
             if (selected[index]) analysis.accent = analysis.colors[index];
+            if (hexIndex === index) hexInput.value = input.value;
             repaintScene();
+        };
+        let openOnClick = false;
+        chip.addEventListener("pointerdown", () => {
+            openOnClick = hexIndex === index && document.activeElement === hexInput;
         });
+        chip.addEventListener("click", (event) => {
+            event.stopPropagation();
+            if (recording) return;
+            hexIndex = index;
+            markHex();
+            hexInput.value = hexOf(analysis.colors[index]);
+            hexInput.focus();
+            hexInput.select();
+            if (openOnClick) openPicker(input);
+            openOnClick = false;
+        });
+        input.addEventListener("input", applyColor);
+        input.addEventListener("change", applyColor);
 
-        dot.append(hide, input);
+        dot.append(hide, chip, input);
         swatches.append(dot);
+    });
+    showHex();
+};
+
+const markCount = () => {
+    const count = selected.filter(Boolean).length;
+    counts.querySelectorAll("button").forEach((button) => {
+        button.setAttribute("aria-pressed", Number(button.dataset.count) === count ? "true" : "false");
     });
 };
 
-const syncCount = () => {
-    const count = selected.filter(Boolean).length;
-    countInput.max = String(analysis.colors.length);
-    countInput.value = String(count);
-    countRead.textContent = String(count);
-    countInput.setAttribute("aria-valuemax", String(analysis.colors.length));
-    countInput.setAttribute("aria-valuenow", String(count));
+const renderCounts = () => {
+    counts.replaceChildren();
+    analysis.colors.forEach((_, index) => {
+        const count = index + 1;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.count = String(count);
+        button.textContent = String(count);
+        button.addEventListener("click", () => {
+            if (recording) return;
+            applyCount(count);
+        });
+        counts.append(button);
+    });
+    markCount();
+};
+
+const paintGround = () => {
+    const hex = hexOf(analysis.bg);
+    groundInput.value = hex;
+    groundChip.style.background = hex;
+    if (document.activeElement !== groundHex) groundHex.value = hex;
+};
+
+const applyGroundHex = (value, allowShort) => {
+    if (recording || !analysis) return false;
+    const color = parseHex(value, allowShort);
+    if (!color) return false;
+    analysis.bg = color;
+    groundInput.value = hexOf(color);
+    groundChip.style.background = hexOf(color);
+    repaintScene();
+    return true;
 };
 
 const applyCount = (count) => {
     selected = analysis.colors.map((_, index) => index < count);
-    syncCount();
+    markCount();
     swatches.querySelectorAll(".dot").forEach((dot, index) => {
         const on = Boolean(selected[index]);
         dot.dataset.on = on ? "true" : "false";
@@ -805,13 +973,24 @@ const setBusy = (busy) => {
     lengthButtons.forEach((button) => {
         button.disabled = busy;
     });
+    formatButtons.forEach((button) => {
+        button.disabled = busy;
+    });
     swatches.querySelectorAll("button, input").forEach((control) => {
         control.disabled = busy;
     });
-    tempoInput.disabled = busy;
-    countInput.disabled = busy;
-    groundInput.disabled = busy;
+    counts.querySelectorAll("button").forEach((button) => {
+        button.disabled = busy;
+    });
+    tempoButtons.forEach((button) => {
+        button.disabled = busy;
+    });
+    groundChip.disabled = busy;
+    groundOpen.disabled = busy;
+    hexInput.disabled = busy;
+    groundHex.disabled = busy;
     photoButton.disabled = busy;
+    loopButton.disabled = busy;
 };
 
 const preview = (now) => {
@@ -819,9 +998,9 @@ const preview = (now) => {
     if (!lastFrame) lastFrame = now;
     const dt = Math.min(0.05, (now - lastFrame) / 1000);
     lastFrame = now;
-    animTime += dt * tempo;
+    animTime += dt * (loopOn ? 1 : tempo);
     clockTime += dt;
-    paint(animTime, clockTime, 0);
+    paint(loopOn ? animTime % duration : animTime, clockTime, 0);
     raf = requestAnimationFrame(preview);
 };
 
@@ -846,30 +1025,39 @@ const useImage = (image) => {
     analysis = readPalette(image);
     selected = analysis.colors.map(() => true);
     sceneSeed = (Math.random() * 1e9) | 0;
-    groundInput.value = hexOf(analysis.bg);
-    syncCount();
+    paintGround();
+    renderCounts();
     renderSwatches();
     showScene(buildScene(activePalette(), sceneSeed), "");
 };
 
-const mimeType = () => {
-    const types = [
-        "video/webm;codecs=vp9,opus",
-        "video/webm;codecs=vp8,opus",
-        "video/webm",
+const FORMAT_TYPES = {
+    webm: ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"],
+    mp4: [
+        "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+        "video/mp4;codecs=avc1.4D401E,mp4a.40.2",
+        "video/mp4;codecs=avc3.42E01E,mp4a.40.2",
         "video/mp4"
-    ];
+    ]
+};
+
+const mimeType = () => {
+    const types = FORMAT_TYPES[format] || FORMAT_TYPES.webm;
     return types.find((type) => MediaRecorder.isTypeSupported(type)) || "";
 };
 
-const startAmbience = (audioCtx, destination) => {
+const startAmbience = (audioCtx, destination, live = true) => {
     const master = audioCtx.createGain();
-    master.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-    master.gain.linearRampToValueAtTime(0.11, audioCtx.currentTime + 1.1);
-    master.gain.setValueAtTime(0.11, audioCtx.currentTime + Math.max(1.2, duration - 1.3));
-    master.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    if (loopOn) {
+        master.gain.setValueAtTime(0.11, audioCtx.currentTime);
+    } else {
+        master.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+        master.gain.linearRampToValueAtTime(0.11, audioCtx.currentTime + 1.1);
+        master.gain.setValueAtTime(0.11, audioCtx.currentTime + Math.max(1.2, duration - 1.3));
+        master.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    }
     master.connect(destination);
-    master.connect(audioCtx.destination);
+    if (live && destination !== audioCtx.destination) master.connect(audioCtx.destination);
 
     const brightness = (scene.bg.r + scene.bg.g + scene.bg.b) / (255 * 3);
     const base = 146 + brightness * 40;
@@ -880,12 +1068,14 @@ const startAmbience = (audioCtx, destination) => {
         const lfo = audioCtx.createOscillator();
         const lfoGain = audioCtx.createGain();
         osc.type = index === 2 ? "triangle" : "sine";
-        osc.frequency.value = base * (2 ** (semi / 12));
+        const tone = base * (2 ** (semi / 12));
+        osc.frequency.value = loopOn ? Math.max(1, Math.round(tone * duration)) / duration : tone;
         osc.detune.value = (index - 1) * 7;
         gain.gain.value = index === 0 ? 0.55 : 0.18;
         filter.type = "lowpass";
         filter.frequency.value = 520;
-        lfo.frequency.value = 0.04 + index * 0.025;
+        const drift = 0.04 + index * 0.025;
+        lfo.frequency.value = loopOn ? Math.max(1, Math.round(drift * duration)) / duration : drift;
         lfoGain.gain.value = 140;
         lfo.connect(lfoGain);
         lfoGain.connect(filter.frequency);
@@ -897,7 +1087,8 @@ const startAmbience = (audioCtx, destination) => {
         return { osc, lfo };
     });
 
-    const noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+    const noiseSeconds = loopOn ? duration : 2;
+    const noiseBuffer = audioCtx.createBuffer(1, Math.ceil(audioCtx.sampleRate * noiseSeconds), audioCtx.sampleRate);
     const channel = noiseBuffer.getChannelData(0);
     for (let i = 0; i < channel.length; i++) channel[i] = Math.random() * 2 - 1;
     const noise = audioCtx.createBufferSource();
@@ -924,11 +1115,165 @@ const startAmbience = (audioCtx, destination) => {
     };
 };
 
+const mp4Config = async () => {
+    if (!window.Mp4Muxer || typeof VideoEncoder === "undefined") return null;
+    const videoOptions = { width: WIDTH, height: HEIGHT, bitrate: 8_000_000, framerate: FPS, latencyMode: "realtime" };
+    const videoCodecs = ["avc1.420028", "avc1.4d0028", "avc1.42E01E"];
+    let video = null;
+    for (const codec of videoCodecs) {
+        const withAvc = { ...videoOptions, codec, avc: { format: "avc" } };
+        const plain = { ...videoOptions, codec };
+        const supported = await VideoEncoder.isConfigSupported(withAvc);
+        if (supported.supported) {
+            video = withAvc;
+            break;
+        }
+        const fallback = await VideoEncoder.isConfigSupported(plain);
+        if (fallback.supported) {
+            video = plain;
+            break;
+        }
+    }
+    if (!video) return null;
+    let audio = null;
+    if (typeof AudioEncoder !== "undefined") {
+        const candidate = { codec: "mp4a.40.2", sampleRate: 48000, numberOfChannels: 2, bitrate: 128_000 };
+        const supported = await AudioEncoder.isConfigSupported(candidate);
+        if (supported.supported) audio = candidate;
+    }
+    return { video, audio };
+};
+
+/* Varje bild får sin egen tid, så filen inte står still i början. */
+const encodeMp4 = async () => {
+    const config = await mp4Config();
+    if (!config) return false;
+
+    const frames = Math.round(duration * FPS);
+    const target = new Mp4Muxer.ArrayBufferTarget();
+    const muxer = new Mp4Muxer.Muxer({
+        target,
+        video: { codec: "avc", width: WIDTH, height: HEIGHT, frameRate: FPS },
+        audio: config.audio
+            ? { codec: "aac", numberOfChannels: 2, sampleRate: config.audio.sampleRate }
+            : undefined,
+        firstTimestampBehavior: "offset",
+        fastStart: "in-memory"
+    });
+
+    let failed = null;
+    const chunkBytes = (chunk) => {
+        const data = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(data);
+        return data;
+    };
+    const videoEncoder = new VideoEncoder({
+        output: (chunk, meta) => muxer.addVideoChunkRaw(
+            chunkBytes(chunk),
+            chunk.type,
+            chunk.timestamp,
+            chunk.duration ?? Math.round(1e6 / FPS),
+            meta
+        ),
+        error: (error) => {
+            failed = error;
+        }
+    });
+    videoEncoder.configure(config.video);
+
+    let audioEncoder = null;
+    if (config.audio) {
+        const packetSpan = Math.round(1024 * 1e6 / config.audio.sampleRate);
+        audioEncoder = new AudioEncoder({
+            output: (chunk, meta) => {
+                if (chunk.timestamp >= duration * 1e6) return;
+                muxer.addAudioChunkRaw(
+                    chunkBytes(chunk),
+                    chunk.type,
+                    chunk.timestamp,
+                    chunk.duration ?? packetSpan,
+                    meta
+                );
+            },
+            error: (error) => {
+                failed = error;
+            }
+        });
+        audioEncoder.configure(config.audio);
+        const offline = new OfflineAudioContext(2, Math.round(config.audio.sampleRate * duration), config.audio.sampleRate);
+        startAmbience(offline, offline.destination, false);
+        const rendered = await offline.startRendering();
+        const left = rendered.getChannelData(0);
+        const right = rendered.numberOfChannels > 1 ? rendered.getChannelData(1) : left;
+        const packet = 1024;
+        for (let offset = 0; offset < left.length; offset += packet) {
+            const count = Math.min(packet, left.length - offset);
+            const planar = new Float32Array(packet * 2);
+            planar.set(left.subarray(offset, offset + count), 0);
+            planar.set(right.subarray(offset, offset + count), packet);
+            const sample = new AudioData({
+                format: "f32-planar",
+                sampleRate: config.audio.sampleRate,
+                numberOfFrames: packet,
+                numberOfChannels: 2,
+                timestamp: Math.round(offset * 1e6 / config.audio.sampleRate),
+                data: planar
+            });
+            audioEncoder.encode(sample);
+            sample.close();
+        }
+        await audioEncoder.flush();
+        audioEncoder.close();
+    }
+
+    for (let i = 0; i < frames; i++) {
+        if (failed) throw failed;
+        const clock = i / FPS;
+        const motionTime = loopOn ? clock : clock * tempo;
+        const fadeOut = loopOn || clock <= duration - 0.8 ? 0 : (clock - (duration - 0.8)) / 0.8;
+        paint(motionTime, clock, clamp(fadeOut, 0, 1));
+        const timestamp = Math.round(i * 1e6 / FPS);
+        const frame = new VideoFrame(canvas, {
+            timestamp,
+            duration: Math.round((i + 1) * 1e6 / FPS) - timestamp
+        });
+        videoEncoder.encode(frame, { keyFrame: i % (FPS * 2) === 0 });
+        frame.close();
+        status.textContent = `Spelar in ${Math.min(duration, Math.ceil((i + 1) / FPS))} / ${duration} s`;
+        if (videoEncoder.encodeQueueSize > 4) {
+            await new Promise((resolve) => videoEncoder.addEventListener("dequeue", resolve, { once: true }));
+        }
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+
+    await videoEncoder.flush();
+    videoEncoder.close();
+    if (failed) throw failed;
+    muxer.finalize();
+
+    if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+    const blob = new Blob([target.buffer], { type: "video/mp4" });
+    downloadUrl = URL.createObjectURL(blob);
+    downloadLink.href = downloadUrl;
+    downloadLink.download = loopOn ? "wsk-loop.mp4" : "wsk-klipp.mp4";
+    downloadLink.hidden = false;
+    recording = false;
+    setBusy(false);
+    status.textContent = loopOn ? "Loop klar." : "Klipp klart.";
+    animTime = 0;
+    lastFrame = 0;
+    raf = requestAnimationFrame(preview);
+    return true;
+};
+
 const recordClip = async () => {
     if (!scene || recording) return;
     const type = mimeType();
-    if (!type || !canvas.captureStream) {
-        status.textContent = "Den här webbläsaren kan inte spara klippet.";
+    const directMp4 = format === "mp4" && await mp4Config();
+    if (!directMp4 && (!type || !canvas.captureStream)) {
+        status.textContent = format === "mp4"
+            ? "Den här webbläsaren kan inte spara mp4."
+            : "Den här webbläsaren kan inte spara klippet.";
         return;
     }
 
@@ -939,6 +1284,11 @@ const recordClip = async () => {
 
     sceneSeed = (Math.random() * 1e9) | 0;
     scene = buildScene(activePalette(), sceneSeed);
+
+    if (directMp4) {
+        const wrote = await encodeMp4();
+        if (wrote) return;
+    }
 
     const audioCtx = new AudioContext();
     await audioCtx.resume();
@@ -955,7 +1305,7 @@ const recordClip = async () => {
         if (event.data.size) chunks.push(event.data);
     };
 
-    const extension = type.includes("mp4") ? "mp4" : "webm";
+    const extension = format === "mp4" ? "mp4" : "webm";
     const done = new Promise((resolve) => {
         recorder.onstop = () => resolve();
     });
@@ -969,8 +1319,9 @@ const recordClip = async () => {
         const time = elapsed();
         clipTime += Math.min(0.05, (now - lastTick) / 1000) * tempo;
         lastTick = now;
-        const fadeOut = time > duration - 0.8 ? (time - (duration - 0.8)) / 0.8 : 0;
-        paint(clipTime, time, clamp(fadeOut, 0, 1));
+        const shown = loopOn ? Math.min(time, Math.max(0, duration - 1 / FPS)) : clipTime;
+        const fadeOut = loopOn || time <= duration - 0.8 ? 0 : (time - (duration - 0.8)) / 0.8;
+        paint(shown, time, clamp(fadeOut, 0, 1));
         status.textContent = `Spelar in ${Math.min(duration, Math.ceil(time))} / ${duration} s`;
         if (time >= duration) return;
         raf = requestAnimationFrame(tick);
@@ -988,7 +1339,8 @@ const recordClip = async () => {
     });
 
     cancelAnimationFrame(raf);
-    paint(clipTime, duration, 1);
+    if (loopOn) paint(Math.max(0, duration - 1 / FPS), duration, 0);
+    else paint(clipTime, duration, 1);
     recorder.stop();
     await done;
     stream.getTracks().forEach((track) => track.stop());
@@ -999,12 +1351,12 @@ const recordClip = async () => {
     const blob = new Blob(chunks, { type: type });
     downloadUrl = URL.createObjectURL(blob);
     downloadLink.href = downloadUrl;
-    downloadLink.download = `wsk-klipp.${extension}`;
+    downloadLink.download = loopOn ? `wsk-loop.${extension}` : `wsk-klipp.${extension}`;
     downloadLink.hidden = false;
 
     recording = false;
     setBusy(false);
-    status.textContent = "Klipp klart.";
+    status.textContent = loopOn ? "Loop klar." : "Klipp klart.";
     animTime = clipTime;
     lastFrame = 0;
     raf = requestAnimationFrame(preview);
@@ -1020,21 +1372,81 @@ lengthButtons.forEach((button) => {
     });
 });
 
-tempoInput.addEventListener("input", () => {
-    tempo = Number(tempoInput.value);
-    tempoRead.textContent = tempoWord(tempo);
-    tempoInput.setAttribute("aria-valuenow", tempoInput.value);
+formatButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+        if (recording) return;
+        format = button.dataset.format;
+        formatButtons.forEach((item) => {
+            item.setAttribute("aria-pressed", item === button ? "true" : "false");
+        });
+    });
 });
 
-countInput.addEventListener("input", () => {
-    if (recording || !analysis) return;
-    applyCount(Number(countInput.value));
+tempoButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+        if (recording) return;
+        tempo = Number(button.dataset.tempo);
+        tempoButtons.forEach((item) => {
+            item.setAttribute("aria-pressed", item === button ? "true" : "false");
+        });
+    });
 });
+
+const chooseGround = () => {
+    if (recording || !analysis) return;
+    openPicker(groundInput);
+};
+
+let openGroundOnClick = false;
+groundChip.addEventListener("pointerdown", () => {
+    openGroundOnClick = document.activeElement === groundHex;
+});
+groundChip.addEventListener("click", () => {
+    if (recording || !analysis) return;
+    groundHex.value = hexOf(analysis.bg);
+    groundHex.focus();
+    groundHex.select();
+    if (openGroundOnClick) chooseGround();
+    openGroundOnClick = false;
+});
+groundOpen.addEventListener("click", chooseGround);
+
+const bindHex = (input, apply) => {
+    input.addEventListener("input", () => {
+        apply(input.value, false);
+    });
+    input.addEventListener("change", () => {
+        if (!apply(input.value, true) && analysis) {
+            input.value = input === groundHex ? hexOf(analysis.bg) : hexOf(analysis.colors[hexIndex]);
+        } else if (analysis) {
+            input.value = input === groundHex ? hexOf(analysis.bg) : hexOf(analysis.colors[hexIndex]);
+        }
+    });
+    input.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        input.blur();
+    });
+};
+
+bindHex(hexInput, applySwatchHex);
+bindHex(groundHex, applyGroundHex);
 
 groundInput.addEventListener("input", () => {
     if (recording || !analysis) return;
     analysis.bg = colorOf(groundInput.value);
+    groundChip.style.background = groundInput.value;
+    groundHex.value = groundInput.value;
     repaintScene();
+});
+
+loopButton.addEventListener("click", () => {
+    if (recording) return;
+    loopOn = !loopOn;
+    loopButton.setAttribute("aria-pressed", loopOn ? "true" : "false");
+    if (loopOn) {
+        animTime = 0;
+        lastFrame = 0;
+    }
 });
 
 photoButton.addEventListener("click", () => {
@@ -1053,6 +1465,9 @@ generateButton.addEventListener("click", () => {
         recording = false;
         setBusy(false);
         status.textContent = "Inspelningen avbröts.";
+        cancelAnimationFrame(raf);
+        lastFrame = 0;
+        raf = requestAnimationFrame(preview);
     });
 });
 
