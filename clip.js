@@ -1117,22 +1117,33 @@ const startAmbience = (audioCtx, destination, live = true) => {
 
 const mp4Config = async () => {
     if (!window.Mp4Muxer || typeof VideoEncoder === "undefined") return null;
-    const videoOptions = { width: WIDTH, height: HEIGHT, bitrate: 8_000_000, framerate: FPS, latencyMode: "realtime" };
+    const videoOptions = {
+        width: WIDTH,
+        height: HEIGHT,
+        bitrate: 36_000_000,
+        bitrateMode: "variable",
+        framerate: FPS,
+        latencyMode: "quality"
+    };
     const videoCodecs = ["avc1.420028", "avc1.4d0028", "avc1.42E01E"];
+    const attempts = [videoOptions, { ...videoOptions, latencyMode: "realtime" }];
     let video = null;
-    for (const codec of videoCodecs) {
-        const withAvc = { ...videoOptions, codec, avc: { format: "avc" } };
-        const plain = { ...videoOptions, codec };
-        const supported = await VideoEncoder.isConfigSupported(withAvc);
-        if (supported.supported) {
-            video = withAvc;
-            break;
+    for (const options of attempts) {
+        for (const codec of videoCodecs) {
+            const withAvc = { ...options, codec, avc: { format: "avc" } };
+            const plain = { ...options, codec };
+            const supported = await VideoEncoder.isConfigSupported(withAvc);
+            if (supported.supported) {
+                video = withAvc;
+                break;
+            }
+            const fallback = await VideoEncoder.isConfigSupported(plain);
+            if (fallback.supported) {
+                video = plain;
+                break;
+            }
         }
-        const fallback = await VideoEncoder.isConfigSupported(plain);
-        if (fallback.supported) {
-            video = plain;
-            break;
-        }
+        if (video) break;
     }
     if (!video) return null;
     let audio = null;
@@ -1299,7 +1310,7 @@ const recordClip = async () => {
         ...canvas.captureStream(FPS).getVideoTracks(),
         ...audioDest.stream.getAudioTracks()
     ]);
-    const recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 8_000_000 });
+    const recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 36_000_000 });
     const chunks = [];
     recorder.ondataavailable = (event) => {
         if (event.data.size) chunks.push(event.data);
