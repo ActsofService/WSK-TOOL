@@ -1,0 +1,293 @@
+/* =====================================================================
+   INSTÄLLNINGAR
+   ===================================================================== */
+
+:root {
+    --font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+    --bg: #f3f4ea;
+    --ink: #1a1a1a;
+    --muted: rgba(26, 26, 26, 0.52);
+    --accent: #e10600;
+
+    --gutter: 22px;
+}
+
+
+/* =====================================================================
+   BAS
+   ===================================================================== */
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: row;
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 0.95rem;
+    font-weight: 400;
+    line-height: 1.3;
+}
+
+button,
+a {
+    color: inherit;
+    font: inherit;
+}
+
+button {
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+button:disabled {
+    cursor: default;
+    opacity: 0.35;
+}
+
+a {
+    text-decoration: none;
+}
+
+.file {
+    display: none;
+}
+
+
+/* =====================================================================
+   HÖGER SIDA
+   ===================================================================== */
+
+aside {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: flex-end;
+    width: 16.5rem;
+    gap: 1.15rem;
+    padding: 18px var(--gutter) 16px;
+    text-align: right;
+}
+
+.logo {
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+}
+
+.tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.15rem;
+    align-items: baseline;
+    justify-content: flex-end;
+}
+
+.lengths {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.lengths button[aria-pressed="true"],
+#photo[aria-pressed="true"] {
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+}
+
+.generate {
+    color: var(--accent);
+}
+
+.download {
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+}
+
+button:hover:not(:disabled),
+.download:hover {
+    color: var(--accent);
+}
+
+
+/* =====================================================================
+   PARAMETRAR
+   ===================================================================== */
+
+.params {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1.05rem;
+    width: 100%;
+}
+
+.param {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4rem;
+}
+
+.param-label,
+.tempo {
+    margin: 0;
+    color: var(--ink);
+    font-size: 0.85rem;
+}
+
+.hint {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.swatches {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    max-width: 12.5rem;
+}
+
+.dot {
+    position: relative;
+    width: 1.7rem;
+    height: 1.7rem;
+}
+
+.dot-hide {
+    width: 1.7rem;
+    height: 1.7rem;
+    border: 1px solid rgba(26, 26, 26, 0.35);
+    border-radius: 50%;
+}
+
+.dot[data-on="false"] {
+    opacity: 0.28;
+}
+
+.swatch {
+    position: absolute;
+    top: 0.24rem;
+    left: 0.24rem;
+    width: calc(100% - 0.48rem);
+    height: calc(100% - 0.48rem);
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+}
+
+.swatch::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.swatch::-webkit-color-swatch {
+    border: 0;
+    border-radius: 50%;
+}
+
+.swatch::-moz-color-swatch {
+    border: 0;
+    border-radius: 50%;
+}
+
+input[type="range"] {
+    width: 8.5rem;
+    margin: 0;
+    accent-color: var(--ink);
+}
+
+.tempo-read {
+    min-width: 4.4rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+
+/* =====================================================================
+   BILDYTA
+   ===================================================================== */
+
+main {
+    display: grid;
+    flex: 1;
+    place-items: center;
+    min-width: 0;
+    min-height: 0;
+    padding: 18px 8px 18px var(--gutter);
+}
+
+canvas {
+    width: min(100%, calc((100vh - 36px) * 16 / 9));
+    height: auto;
+    aspect-ratio: 16 / 9;
+    background: transparent;
+}
+
+.empty {
+    max-width: 16rem;
+    margin: 0;
+    color: var(--muted);
+    text-align: center;
+}
+
+body.drag .empty,
+body.drag main {
+    outline: 1px dashed var(--accent);
+    outline-offset: -16px;
+}
+
+.credit {
+    max-width: 16rem;
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.75rem;
+    line-height: 1.35;
+    text-align: right;
+}
+
+.status {
+    min-height: 1.3em;
+    margin: auto 0 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-align: right;
+}
+
+
+/* =====================================================================
+   MOBIL
+   ===================================================================== */
+
+@media (max-width: 800px) {
+    :root {
+        --gutter: 16px;
+    }
+
+    body {
+        flex-direction: column;
+    }
+
+    aside {
+        width: auto;
+        padding-top: 8px;
+    }
+
+    canvas {
+        width: min(100%, calc((100vh - 280px) * 16 / 9));
+    }
+}
