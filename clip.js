@@ -11,6 +11,7 @@ const ctx = canvas.getContext("2d", { alpha: false });
 const empty = document.getElementById("empty");
 const status = document.getElementById("status");
 const generateButton = document.getElementById("generate");
+const stillButton = document.getElementById("still");
 const downloadLink = document.getElementById("download");
 const fileInput = document.getElementById("file");
 const lengthButtons = document.querySelectorAll("[data-length]");
@@ -33,6 +34,22 @@ canvas.height = HEIGHT;
 const INTRO = 7.6;
 
 let duration = 10;
+
+/* Korta klipp är ett varv. Längre loopar upprepar samma varv. */
+const loopCycle = () => (loopOn && duration > 15 ? 10 : duration);
+
+const lengthText = (seconds) => {
+    const whole = Math.max(0, Math.round(seconds));
+    if (whole >= 60 && whole % 60 === 0) return `${whole / 60} min`;
+    if (whole > 60) return `${Math.floor(whole / 60)} min ${whole % 60} s`;
+    return `${whole} s`;
+};
+
+const videoBitrate = () => {
+    if (duration <= 30) return 36_000_000;
+    const target = 190 * 1024 * 1024;
+    return Math.max(5_000_000, Math.min(24_000_000, Math.round((target * 8) / duration)));
+};
 let format = "webm";
 let tempo = 1;
 let showPhoto = false;
@@ -49,6 +66,7 @@ let lastFrame = 0;
 let raf = 0;
 let recording = false;
 let downloadUrl = "";
+let stillCount = 0;
 
 const randOf = (seed) => {
     let a = seed >>> 0;
@@ -367,7 +385,7 @@ const buildScene = (palette, seed) => {
 /* En loop är ett långsamt varv. Den är tillbaka av sig själv, utan ett ryck på slutet. */
 const motion = (time, omega, phase) => {
     if (!loopOn) return time * omega + phase;
-    return phase + (time / duration) * Math.PI * 2;
+    return phase + (time / loopCycle()) * Math.PI * 2;
 };
 
 /* Varje boll vandrar runt sin plats. Par som redan står nära går ihop och tillbaka. */
@@ -970,6 +988,7 @@ const applyCount = (count) => {
 
 const setBusy = (busy) => {
     generateButton.disabled = busy || !scene;
+    stillButton.disabled = busy || !scene;
     lengthButtons.forEach((button) => {
         button.disabled = busy;
     });
@@ -1000,7 +1019,7 @@ const preview = (now) => {
     lastFrame = now;
     animTime += dt * (loopOn ? 1 : tempo);
     clockTime += dt;
-    paint(loopOn ? animTime % duration : animTime, clockTime, 0);
+    paint(loopOn ? animTime % loopCycle() : animTime, clockTime, 0);
     raf = requestAnimationFrame(preview);
 };
 
@@ -1011,6 +1030,7 @@ const showScene = (next, message) => {
     empty.hidden = true;
     params.hidden = false;
     generateButton.disabled = false;
+    stillButton.disabled = false;
     status.textContent = message;
     cancelAnimationFrame(raf);
     animTime = 0;
@@ -1069,13 +1089,13 @@ const startAmbience = (audioCtx, destination, live = true) => {
         const lfoGain = audioCtx.createGain();
         osc.type = index === 2 ? "triangle" : "sine";
         const tone = base * (2 ** (semi / 12));
-        osc.frequency.value = loopOn ? Math.max(1, Math.round(tone * duration)) / duration : tone;
+        osc.frequency.value = loopOn ? Math.max(1, Math.round(tone * loopCycle())) / loopCycle() : tone;
         osc.detune.value = (index - 1) * 7;
         gain.gain.value = index === 0 ? 0.55 : 0.18;
         filter.type = "lowpass";
         filter.frequency.value = 520;
         const drift = 0.04 + index * 0.025;
-        lfo.frequency.value = loopOn ? Math.max(1, Math.round(drift * duration)) / duration : drift;
+        lfo.frequency.value = loopOn ? Math.max(1, Math.round(drift * loopCycle())) / loopCycle() : drift;
         lfoGain.gain.value = 140;
         lfo.connect(lfoGain);
         lfoGain.connect(filter.frequency);
@@ -1087,7 +1107,7 @@ const startAmbience = (audioCtx, destination, live = true) => {
         return { osc, lfo };
     });
 
-    const noiseSeconds = loopOn ? duration : 2;
+    const noiseSeconds = loopOn ? loopCycle() : 2;
     const noiseBuffer = audioCtx.createBuffer(1, Math.ceil(audioCtx.sampleRate * noiseSeconds), audioCtx.sampleRate);
     const channel = noiseBuffer.getChannelData(0);
     for (let i = 0; i < channel.length; i++) channel[i] = Math.random() * 2 - 1;
@@ -1120,7 +1140,7 @@ const mp4Config = async () => {
     const videoOptions = {
         width: WIDTH,
         height: HEIGHT,
-        bitrate: 36_000_000,
+        bitrate: videoBitrate(),
         bitrateMode: "variable",
         framerate: FPS,
         latencyMode: "quality"
@@ -1160,7 +1180,9 @@ const encodeMp4 = async () => {
     const config = await mp4Config();
     if (!config) return false;
 
-    const frames = Math.round(duration * FPS);
+    const cycle = loopCycle();
+    const repeats = loopOn ? Math.max(1, Math.round(duration / cycle)) : 1;
+    const frameCount = Math.round((repeats > 1 ? cycle : duration) * FPS);
     const target = new Mp4Muxer.ArrayBufferTarget();
     const muxer = new Mp4Muxer.Muxer({
         target,
@@ -1178,14 +1200,15 @@ const encodeMp4 = async () => {
         chunk.copyTo(data);
         return data;
     };
+    const encodedVideo = repeats > 1 ? [] : null;
     const videoEncoder = new VideoEncoder({
-        output: (chunk, meta) => muxer.addVideoChunkRaw(
-            chunkBytes(chunk),
-            chunk.type,
-            chunk.timestamp,
-            chunk.duration ?? Math.round(1e6 / FPS),
-            meta
-        ),
+        output: (chunk, meta) => {
+            const data = chunkBytes(chunk);
+            const timestamp = chunk.timestamp;
+            const span = chunk.duration ?? Math.round(1e6 / FPS);
+            if (encodedVideo) encodedVideo.push({ data, type: chunk.type, timestamp, duration: span, meta });
+            else muxer.addVideoChunkRaw(data, chunk.type, timestamp, span, meta);
+        },
         error: (error) => {
             failed = error;
         }
@@ -1211,17 +1234,22 @@ const encodeMp4 = async () => {
             }
         });
         audioEncoder.configure(config.audio);
-        const offline = new OfflineAudioContext(2, Math.round(config.audio.sampleRate * duration), config.audio.sampleRate);
+        const cycleSamples = Math.round(config.audio.sampleRate * (repeats > 1 ? cycle : duration));
+        const offline = new OfflineAudioContext(2, cycleSamples, config.audio.sampleRate);
         startAmbience(offline, offline.destination, false);
         const rendered = await offline.startRendering();
         const left = rendered.getChannelData(0);
         const right = rendered.numberOfChannels > 1 ? rendered.getChannelData(1) : left;
         const packet = 1024;
-        for (let offset = 0; offset < left.length; offset += packet) {
-            const count = Math.min(packet, left.length - offset);
+        const totalSamples = cycleSamples * (repeats > 1 ? repeats : 1);
+        for (let offset = 0; offset < totalSamples; offset += packet) {
+            const count = Math.min(packet, totalSamples - offset);
             const planar = new Float32Array(packet * 2);
-            planar.set(left.subarray(offset, offset + count), 0);
-            planar.set(right.subarray(offset, offset + count), packet);
+            for (let i = 0; i < count; i++) {
+                const source = (offset + i) % left.length;
+                planar[i] = left[source];
+                planar[packet + i] = right[source];
+            }
             const sample = new AudioData({
                 format: "f32-planar",
                 sampleRate: config.audio.sampleRate,
@@ -1237,7 +1265,7 @@ const encodeMp4 = async () => {
         audioEncoder.close();
     }
 
-    for (let i = 0; i < frames; i++) {
+    for (let i = 0; i < frameCount; i++) {
         if (failed) throw failed;
         const clock = i / FPS;
         const motionTime = loopOn ? clock : clock * tempo;
@@ -1250,7 +1278,8 @@ const encodeMp4 = async () => {
         });
         videoEncoder.encode(frame, { keyFrame: i % (FPS * 2) === 0 });
         frame.close();
-        status.textContent = `Spelar in ${Math.min(duration, Math.ceil((i + 1) / FPS))} / ${duration} s`;
+        const shown = repeats > 1 ? clock : Math.min(duration, (i + 1) / FPS);
+        status.textContent = `Spelar in ${lengthText(shown)} / ${lengthText(duration)}`;
         if (videoEncoder.encodeQueueSize > 4) {
             await new Promise((resolve) => videoEncoder.addEventListener("dequeue", resolve, { once: true }));
         }
@@ -1259,6 +1288,21 @@ const encodeMp4 = async () => {
 
     await videoEncoder.flush();
     videoEncoder.close();
+    if (encodedVideo) {
+        encodedVideo.sort((a, b) => a.timestamp - b.timestamp);
+        const shift = Math.round(cycle * 1e6);
+        for (let repeat = 0; repeat < repeats; repeat++) {
+            encodedVideo.forEach((sample, index) => {
+                muxer.addVideoChunkRaw(
+                    sample.data,
+                    sample.type,
+                    sample.timestamp + repeat * shift,
+                    sample.duration,
+                    repeat === 0 && index === 0 ? sample.meta : undefined
+                );
+            });
+        }
+    }
     if (failed) throw failed;
     muxer.finalize();
 
@@ -1310,7 +1354,7 @@ const recordClip = async () => {
         ...canvas.captureStream(FPS).getVideoTracks(),
         ...audioDest.stream.getAudioTracks()
     ]);
-    const recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 36_000_000 });
+    const recorder = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: videoBitrate() });
     const chunks = [];
     recorder.ondataavailable = (event) => {
         if (event.data.size) chunks.push(event.data);
@@ -1333,7 +1377,7 @@ const recordClip = async () => {
         const shown = loopOn ? Math.min(time, Math.max(0, duration - 1 / FPS)) : clipTime;
         const fadeOut = loopOn || time <= duration - 0.8 ? 0 : (time - (duration - 0.8)) / 0.8;
         paint(shown, time, clamp(fadeOut, 0, 1));
-        status.textContent = `Spelar in ${Math.min(duration, Math.ceil(time))} / ${duration} s`;
+        status.textContent = `Spelar in ${lengthText(Math.min(duration, time))} / ${lengthText(duration)}`;
         if (time >= duration) return;
         raf = requestAnimationFrame(tick);
     };
@@ -1469,6 +1513,22 @@ photoButton.addEventListener("click", () => {
         clockTime = 0;
         lastFrame = 0;
     }
+});
+
+stillButton.addEventListener("click", () => {
+    if (!scene || recording) return;
+    stillCount += 1;
+    const number = stillCount;
+    canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `wsk-bild-${number}.png`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+        status.textContent = "Bild sparad.";
+    }, "image/png");
 });
 
 generateButton.addEventListener("click", () => {
