@@ -140,6 +140,12 @@ button:hover:not(:disabled),
     gap: 0.4rem;
 }
 
+.param.row {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.65rem;
+}
+
 .param-label,
 .tempo {
     margin: 0;
@@ -201,6 +207,30 @@ button:hover:not(:disabled),
 }
 
 .swatch::-moz-color-swatch {
+    border: 0;
+    border-radius: 50%;
+}
+
+.ground {
+    width: 1.7rem;
+    height: 1.7rem;
+    padding: 0;
+    border: 1px solid rgba(26, 26, 26, 0.35);
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+}
+
+.ground::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.ground::-webkit-color-swatch {
+    border: 0;
+    border-radius: 50%;
+}
+
+.ground::-moz-color-swatch {
     border: 0;
     border-radius: 50%;
 }

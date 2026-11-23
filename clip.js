@@ -18,6 +18,9 @@ const params = document.getElementById("params");
 const swatches = document.getElementById("swatches");
 const tempoInput = document.getElementById("tempo");
 const tempoRead = document.getElementById("tempo-read");
+const countInput = document.getElementById("count");
+const countRead = document.getElementById("count-read");
+const groundInput = document.getElementById("ground");
 const photoButton = document.getElementById("photo");
 
 canvas.width = WIDTH;
@@ -238,10 +241,10 @@ const buildScene = (palette, seed) => {
     const orbs = plan.map((kind, index) => {
         const [sx, sy] = slots[index];
         const radius = kind === "sharp"
-            ? 0.058 + rand() * 0.034
+            ? 0.028 + rand() * 0.082
             : kind === "soft"
-                ? 0.05 + rand() * 0.028
-                : 0.072 + rand() * 0.03;
+                ? 0.024 + rand() * 0.064
+                : 0.04 + rand() * 0.09;
         return {
             kind,
             x: clamp(sx + (rand() - 0.5) * 0.1, -0.05, 1.05),
@@ -284,8 +287,9 @@ const buildScene = (palette, seed) => {
     });
 
     const sized = orbs.filter((orb) => orb.kind !== "bloom");
-    if (sized[0]) sized[0].radius *= 1.34;
-    if (sized[3]) sized[3].radius *= 1.16;
+    if (sized[0]) sized[0].radius = Math.min(0.21, sized[0].radius * 1.8);
+    if (sized[2]) sized[2].radius = Math.max(0.022, sized[2].radius * 0.58);
+    if (sized[5]) sized[5].radius = Math.min(0.17, sized[5].radius * 1.42);
 
     const partners = orbs.filter((orb) => orb.social && orb.kind !== "bloom");
     for (let i = 0; i + 1 < partners.length && i < 4; i += 2) {
@@ -752,6 +756,7 @@ const renderSwatches = () => {
             dot.dataset.on = selected[index] ? "true" : "false";
             hide.setAttribute("aria-pressed", selected[index] ? "true" : "false");
             hide.setAttribute("aria-label", selected[index] ? "Dölj färgen" : "Visa färgen");
+            syncCount();
             repaintScene();
         });
 
@@ -772,6 +777,29 @@ const renderSwatches = () => {
     });
 };
 
+const syncCount = () => {
+    const count = selected.filter(Boolean).length;
+    countInput.max = String(analysis.colors.length);
+    countInput.value = String(count);
+    countRead.textContent = String(count);
+    countInput.setAttribute("aria-valuemax", String(analysis.colors.length));
+    countInput.setAttribute("aria-valuenow", String(count));
+};
+
+const applyCount = (count) => {
+    selected = analysis.colors.map((_, index) => index < count);
+    syncCount();
+    swatches.querySelectorAll(".dot").forEach((dot, index) => {
+        const on = Boolean(selected[index]);
+        dot.dataset.on = on ? "true" : "false";
+        const hide = dot.querySelector(".dot-hide");
+        if (!hide) return;
+        hide.setAttribute("aria-pressed", on ? "true" : "false");
+        hide.setAttribute("aria-label", on ? "Dölj färgen" : "Visa färgen");
+    });
+    repaintScene();
+};
+
 const setBusy = (busy) => {
     generateButton.disabled = busy || !scene;
     lengthButtons.forEach((button) => {
@@ -781,6 +809,8 @@ const setBusy = (busy) => {
         control.disabled = busy;
     });
     tempoInput.disabled = busy;
+    countInput.disabled = busy;
+    groundInput.disabled = busy;
     photoButton.disabled = busy;
 };
 
@@ -816,6 +846,8 @@ const useImage = (image) => {
     analysis = readPalette(image);
     selected = analysis.colors.map(() => true);
     sceneSeed = (Math.random() * 1e9) | 0;
+    groundInput.value = hexOf(analysis.bg);
+    syncCount();
     renderSwatches();
     showScene(buildScene(activePalette(), sceneSeed), "");
 };
@@ -992,6 +1024,17 @@ tempoInput.addEventListener("input", () => {
     tempo = Number(tempoInput.value);
     tempoRead.textContent = tempoWord(tempo);
     tempoInput.setAttribute("aria-valuenow", tempoInput.value);
+});
+
+countInput.addEventListener("input", () => {
+    if (recording || !analysis) return;
+    applyCount(Number(countInput.value));
+});
+
+groundInput.addEventListener("input", () => {
+    if (recording || !analysis) return;
+    analysis.bg = colorOf(groundInput.value);
+    repaintScene();
 });
 
 photoButton.addEventListener("click", () => {

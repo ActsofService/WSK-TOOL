@@ -25,6 +25,15 @@
                 <p class="hint">Klicka för att ändra</p>
             </div>
             <div class="param">
+                <label class="tempo" for="count">Antal</label>
+                <input id="count" type="range" min="1" max="8" step="1" value="8" aria-valuemin="1" aria-valuemax="8" aria-valuenow="8">
+                <span class="tempo-read" id="count-read">8</span>
+            </div>
+            <div class="param row">
+                <label class="tempo" for="ground">Bakgrund</label>
+                <input id="ground" class="ground" type="color" value="#f3f4ea" aria-label="Bakgrundsfärg">
+            </div>
+            <div class="param">
                 <label class="tempo" for="tempo">Tempo</label>
                 <input id="tempo" type="range" min="0.4" max="1.75" step="0.05" value="1" aria-valuemin="0.4" aria-valuemax="1.75" aria-valuenow="1">
                 <span class="tempo-read" id="tempo-read">Medel</span>
